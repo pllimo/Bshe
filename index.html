@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>野巡 · CRUISE — 毕设中期汇报</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* =========================================================
+       野巡 · CRUISE  —  毕设中期汇报
+       每页最大字 = 关键文案。无章节标题，无英文小标签，无底部条。
+       Author canvas 1280×720, scale-to-viewport.
+       Nav: ← → space, click halves, swipe, wheel, dots.
+    ========================================================= */
+
+    :root {
+      --bg:        #FFFFFF;
+      --bg-2:      #F4F2EE;
+      --ink:       #0F0F0F;
+      --ink-2:     #4B4B4B;
+      --ink-3:     #8A8A8A;
+      --hairline:  rgba(0,0,0,0.08);
+      --accent:    #4A5C42;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Letterbox killer — extends the hero photo into the body letterbox
+       area whenever a photo slide is active, so the 1280×720 canvas no
+       longer shows top/bottom white bars on taller-than-16:9 viewports. */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: url('assets/p1_open.jpg') center 56% / cover no-repeat;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+    body:has(.s00.active)::before,
+    body:has(.s01.active)::before,
+    body:has(.s02.active)::before,
+    body:has(.s10.active)::before {
+      opacity: 1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .slide { transition: none !important; }
+      .slide.active * { animation: none !important; }
+    }
+
+    /* ---------- Stage (1280×720 author canvas) ---------- */
+    .stage {
+      position: fixed;
+      width: 1280px;
+      height: 720px;
+      background: var(--bg);
+      overflow: hidden;
+      transform-origin: 0 0;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+      will-change: opacity;
+    }
+    .slide.active { opacity: 1; pointer-events: auto; }
+
+    /* ---------- Top-left brand mark (the ONLY persistent chrome) ---------- */
+    .brand-mark {
+      position: absolute;
+      top: 38px;
+      left: 56px;
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      font-weight: 600;
+      color: var(--ink);
+      text-transform: uppercase;
+      z-index: 6;
+    }
+    .brand-mark .zh {
+      font-family: "PingFang SC", sans-serif;
+      letter-spacing: 0.16em;
+    }
+    .brand-mark .bar {
+      width: 1px;
+      height: 11px;
+      background: var(--ink-3);
+    }
+    .brand-mark .en {
+      font-family: "Oxanium", sans-serif;
+    }
+    /* When the slide has a darker photo backdrop, brand goes white */
+    .slide.chrome-light .brand-mark { color: #fff; }
+    .slide.chrome-light .brand-mark .bar { background: rgba(255,255,255,0.45); }
+
+    /* ---------- Right-side bar navigator (10 thin vertical strokes) ----------
+       Hit-area is a generous 72×60 transparent strip per dot; the visible
+       2×22 bar is rendered via ::after centered in it. Mouse hovering
+       anywhere along the right edge picks up the nearest bar. */
+    .dots {
+      position: fixed;
+      right: 22px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      z-index: 100;
+    }
+    .dot {
+      width: 24px;
+      background: transparent;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dot::after {
+      content: '';
+      display: block;
+      width: 2px;
+      height: 22px;
+      background: rgba(0,0,0,0.18);
+      transition: height 0.28s cubic-bezier(.2,.7,.2,1),
+                  width  0.28s cubic-bezier(.2,.7,.2,1),
+                  background 0.28s;
+    }
+    .dot:hover::after {
+      height: 38px;
+      background: rgba(0,0,0,0.55);
+    }
+    .dot.active::after {
+      height: 44px;
+      width: 3px;
+      background: var(--accent);
+    }
+    /* On dark photo slides (P2 / P10), lift bar contrast via :has() */
+    body:has(.s02.active) .dot::after,
+    body:has(.s10.active) .dot::after { background: rgba(255,255,255,0.34); }
+    body:has(.s02.active) .dot:hover::after,
+    body:has(.s10.active) .dot:hover::after { background: rgba(255,255,255,0.75); }
+    body:has(.s02.active) .dot.active::after,
+    body:has(.s10.active) .dot.active::after { background: #B6C9A8; }
+
+    /* ---------- Common animations ---------- */
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes riseLong {
+      from { opacity: 0; transform: translateY(60px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---------- Typography helpers ---------- */
+    .lead {
+      font-family: "PingFang SC", sans-serif;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      color: var(--ink);
+    }
+    .lead .accent { color: var(--accent); }
+
+    /* ============================================================
+       SLIDE 00 — Intro (cold open, photo only, no big text)
+    ============================================================ */
+    .s00 .hero {
+      position: absolute; inset: 0;
+      background: url('assets/p1_open.jpg') center 56% / cover no-repeat;
+      background-color: var(--bg);
+    }
+    .s00 .hero::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        180deg,
+        rgba(255,255,255,0.18) 0%,
+        rgba(255,255,255,0) 32%,
+        rgba(255,255,255,0) 72%,
+        rgba(255,255,255,0.22) 100%
+      );
+      pointer-events: none;
+    }
+    .s00 .kicker {
+      position: absolute;
+      left: 56px;
+      bottom: 60px;
+      z-index: 5;
+      animation: rise 1s cubic-bezier(.2,.7,.2,1) 0.4s both;
+    }
+    .s00 .kicker .en {
+      display: block;
+      font-family: "Oxanium", sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.42em;
+      color: var(--accent);
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .s00 .kicker .zh {
+      display: block;
+      font-family: "PingFang SC", sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.14em;
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    /* ============================================================
+       SLIDE 01 — Cover
+    ============================================================ */
+    .s01 .hero {
+      position: absolute;
+      inset: 0;
+      background: url('assets/p1_open.jpg') center 56% / cover no-repeat;
+      background-color: var(--bg);
+    }
+    .s01 .hero::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        108deg,
+        rgba(255,255,255,0.78) 0%,
+        rgba(255,255,255,0.72) 36%,
+        rgba(255,255,255,0.55) 52%,
+        rgba(255,255,255,0.28) 66%,
+        rgba(255,255,255,0.08) 80%,
+        rgba(255,255,255,0) 92%
+      );
+      backdrop-filter: blur(20px) saturate(120%);
+      -webkit-backdrop-filter: blur(20px) saturate(120%);
+      mask-image: linear-gradient(
+        108deg,
+        black 0%,
+        black 60%,
+        rgba(0,0,0,0.6) 76%,
+        rgba(0,0,0,0.2) 88%,
+        transparent 96%
+      );
+      -webkit-mask-image: linear-gradient(
+        108deg,
+        black 0%,
+        black 60%,
+        rgba(0,0,0,0.6) 76%,
+        rgba(0,0,0,0.2) 88%,
+        transparent 96%
+      );
+      pointer-events: none;
+    }
+    .s01 .titles {
+      position: absolute;
+      left: 88px;
+      top: 178px;
+      max-width: 580px;
+      z-index: 3;
+    }
+    @keyframes floatUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .s01 .titles > * {
+      opacity: 0;
+      transform: translateY(22px);
+      will-change: opacity, transform;
+    }
+    .s01.active .product-en { animation: floatUp 1.05s cubic-bezier(.22,.61,.36,1) 0.20s forwards; }
+    .s01.active h1          { animation: floatUp 1.05s cubic-bezier(.22,.61,.36,1) 0.34s forwards; }
+    .s01.active .cruise     { animation: floatUp 1.05s cubic-bezier(.22,.61,.36,1) 0.48s forwards; }
+    .s01.active .lede       { animation: floatUp 1.05s cubic-bezier(.22,.61,.36,1) 0.62s forwards; }
+    .s01 .product-en {
+      font-family: "Oxanium", sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.42em;
+      font-weight: 500;
+      color: var(--accent);
+      margin-bottom: 28px;
+    }
+    .s01 h1 {
+      font-size: 112px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 0.95;
+      color: var(--ink);
+      margin-bottom: 14px;
+    }
+    .s01 .cruise {
+      font-family: "Oxanium", sans-serif;
+      font-size: 38px;
+      font-weight: 400;
+      letter-spacing: 0.18em;
+      color: var(--ink-2);
+      margin-bottom: 36px;
+    }
+    .s01 .lede {
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--ink-2);
+      max-width: 440px;
+      font-weight: 400;
+    }
+    .s01 .lede strong { color: var(--ink); font-weight: 500; }
+
+    .s01 .luggage {
+      position: absolute;
+      right: 78px;
+      bottom: 84px;
+      width: 280px;
+      z-index: 3;
+      animation: rise 0.8s ease-out 0.55s both;
+    }
+    .s01 .luggage img { width: 100%; display: block; }
+    .s01 .luggage .cap {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--ink-3);
+      text-transform: uppercase;
+    }
+    .s01 .luggage .cap .line {
+      width: 28px; height: 1px; background: var(--ink-3);
+    }
+    .s01 .luggage .cap .accent { color: var(--accent); font-weight: 600; }
+
+    /* ============================================================
+       SLIDE 02 — Background (same hero, rising glass overlay)
+    ============================================================ */
+    .s02 .hero {
+      position: absolute;
+      inset: 0;
+      background: url('assets/p1_open.jpg') center 56% / cover no-repeat;
+      background-color: var(--bg);
+    }
+    .s02 .hero::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(20,20,20,0.0) 28%, rgba(20,20,20,0.36) 100%);
+      pointer-events: none;
+    }
+    .s02 .glass {
+      position: absolute;
+      left: 56px;
+      right: 56px;
+      bottom: 56px;
+      padding: 50px 56px 54px;
+      background: rgba(20, 20, 20, 0.72);
+      backdrop-filter: blur(22px) saturate(140%);
+      -webkit-backdrop-filter: blur(22px) saturate(140%);
+      color: #fff;
+      z-index: 3;
+    }
+    .s02.active .glass {
+      animation: riseLong 0.9s cubic-bezier(.2,.7,.2,1) 0.15s both;
+    }
+    .s02 .glass h2 {
+      font-size: 44px;
+      font-weight: 600;
+      line-height: 1.25;
+      margin-bottom: 28px;
+      color: #fff;
+      letter-spacing: -0.005em;
+      max-width: 920px;
+    }
+    .s02 .glass .body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 44px;
+      font-size: 15px;
+      line-height: 1.85;
+      color: rgba(255,255,255,0.78);
+    }
+    .s02 .glass .body p strong {
+      color: #fff;
+      font-weight: 500;
+    }
+
+    /* ============================================================
+       SLIDE 03 — Scenario  (key copy is the lead; small numbers as steps)
+    ============================================================ */
+    .s03 .wrap {
+      position: absolute;
+      inset: 110px 88px 88px 88px;
+      display: flex;
+      flex-direction: column;
+    }
+    .s03 .lead {
+      font-size: 48px;
+      font-weight: 600;
+      line-height: 1.2;
+      max-width: 940px;
+      margin-bottom: 18px;
+    }
+    .s03 .lead .accent { color: var(--accent); }
+    .s03 .sub {
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--ink-2);
+      max-width: 760px;
+      margin-bottom: 50px;
+    }
+    .s03 .pipeline {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      position: relative;
+      max-height: 200px;
+    }
+    .s03 .pipeline::before {
+      content: "";
+      position: absolute;
+      left: 24px; right: 24px;
+      top: 50%;
+      height: 1px;
+      background: repeating-linear-gradient(90deg, var(--hairline) 0 4px, transparent 4px 8px);
+    }
+    .s03 .step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+    .s03 .step .ic {
+      width: 56px; height: 56px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--ink);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--ink);
+    }
+    .s03 .step .ic svg { width: 28px; height: 28px; stroke-width: 1.4; }
+    .s03 .step .num {
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .s03 .step .nm {
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--ink);
+      text-align: center;
+    }
+    .s03 .foot {
+      margin-top: 36px;
+      padding-top: 24px;
+      border-top: 1px solid var(--hairline);
+      font-size: 14px;
+      line-height: 1.85;
+      color: var(--ink-2);
+      max-width: 940px;
+    }
+    .s03 .foot strong { color: var(--ink); font-weight: 500; }
+
+    /* ============================================================
+       SLIDE 04 — Benchmark
+    ============================================================ */
+    .s04 .wrap {
+      position: absolute;
+      inset: 110px 88px 78px 88px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 30px;
+    }
+    .s04 .lead {
+      font-size: 48px;
+      font-weight: 600;
+      line-height: 1.2;
+      max-width: 900px;
+    }
+    .s04 .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 18px;
+    }
+    .s04 .card { display: flex; flex-direction: column; background: var(--bg); }
+    .s04 .card .img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-color: var(--bg-2);
+    }
+    .s04 .card .info { padding-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .s04 .card .role {
+      font-size: 14px;
+      color: var(--ink);
+      font-weight: 500;
+      line-height: 1.4;
+    }
+    .s04 .card .brand {
+      font-family: "Oxanium", monospace;
+      font-size: 10.5px;
+      letter-spacing: 0.16em;
+      color: var(--ink-3);
+      text-transform: uppercase;
+    }
+    .s04 .foot {
+      font-size: 14px;
+      line-height: 1.85;
+      color: var(--ink-2);
+      padding-top: 16px;
+      border-top: 1px solid var(--hairline);
+      max-width: 940px;
+    }
+    .s04 .foot strong { color: var(--ink); font-weight: 500; }
+
+    /* ============================================================
+       SLIDE 05 — Approach
+    ============================================================ */
+    .s05 .wrap {
+      position: absolute;
+      inset: 110px 88px 110px 88px;
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 56px;
+      align-items: center;
+    }
+    .s05 .text-col .lead {
+      font-size: 48px;
+      font-weight: 600;
+      line-height: 1.22;
+      margin-bottom: 44px;
+      max-width: 560px;
+      letter-spacing: -0.005em;
+    }
+    .s05 .text-col .lead .accent { color: var(--accent); }
+    .s05 .points { display: flex; flex-direction: column; gap: 18px; max-width: 520px; }
+    .s05 .point {
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .s05 .point:last-child { border-bottom: none; }
+    .s05 .point .ic {
+      width: 28px; height: 28px; flex: 0 0 28px;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+    .s05 .point .ic svg { width: 24px; height: 24px; stroke-width: 1.4; }
+    .s05 .point .txt {
+      font-size: 15.5px;
+      line-height: 1.65;
+      color: var(--ink);
+      font-weight: 400;
+    }
+    .s05 .point .txt .meta {
+      display: block;
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--ink-3);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .s05 .img-col {
+      width: 100%; height: 100%;
+      background: url('assets/p5_transition.png') center/contain no-repeat;
+    }
+    .s05 .foot {
+      position: absolute;
+      left: 88px;
+      right: 88px;
+      bottom: 56px;
+      font-size: 13.5px;
+      line-height: 1.75;
+      color: var(--ink-2);
+      max-width: 760px;
+    }
+    .s05 .foot strong { color: var(--ink); font-weight: 500; }
+
+    /* ============================================================
+       SLIDE 06 — System overview
+    ============================================================ */
+    .s06 .wrap {
+      position: absolute;
+      inset: 110px 88px 88px 88px;
+      display: flex;
+      flex-direction: column;
+    }
+    .s06 .lead {
+      font-size: 48px;
+      font-weight: 600;
+      line-height: 1.2;
+      max-width: 920px;
+      margin-bottom: 18px;
+    }
+    .s06 .sub {
+      font-size: 15px;
+      color: var(--ink-2);
+      line-height: 1.75;
+      max-width: 760px;
+      margin-bottom: 16px;
+    }
+    .s06 .flow {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      padding-top: 22px;
+      align-items: center;
+      border-top: 1px solid var(--hairline);
+    }
+    .s06 .stage-img {
+      position: relative;
+      width: 100%;
+      height: 280px;
+      background-position: center;
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+    .s06 .stage-cap { text-align: center; margin-top: 6px; }
+    .s06 .stage-cap .num {
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .s06 .stage-cap .nm {
+      font-size: 15px;
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .s06 .slogans {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 22px;
+      padding-top: 20px;
+      border-top: 1px solid var(--hairline);
+    }
+    .s06 .slogan {
+      flex: 1;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--ink);
+      letter-spacing: 0.04em;
+    }
+    .s06 .slogan + .slogan { border-left: 1px solid var(--hairline); }
+    .s06 .slogan .en {
+      display: block;
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--ink-3);
+      font-weight: 500;
+      margin-top: 6px;
+      text-transform: uppercase;
+    }
+
+    /* ============================================================
+       SLIDE 07 — Right-side extension (Interactive)
+    ============================================================ */
+    .s07 .wrap {
+      position: absolute;
+      inset: 110px 88px 88px 88px;
+      display: flex;
+      flex-direction: column;
+    }
+    .s07 .lead {
+      font-size: 44px;
+      font-weight: 600;
+      line-height: 1.25;
+      max-width: 900px;
+      margin-bottom: 8px;
+    }
+    .s07 .sub {
+      font-size: 14.5px;
+      color: var(--ink-2);
+      line-height: 1.7;
+      max-width: 680px;
+    }
+    .s07 .stage-wrap {
+      flex: 1;
+      position: relative;
+      margin: 16px 0 14px;
+    }
+    .s07 .stage-img {
+      position: absolute;
+      inset: 0;
+      background-position: center;
+      background-size: contain;
+      background-repeat: no-repeat;
+      opacity: 0;
+      transition: opacity 0.45s ease;
+    }
+    .s07 .stage-img.active { opacity: 1; }
+
+    .s07 .control {
+      display: flex;
+      gap: 36px;
+      padding-top: 16px;
+      align-items: center;
+      border-top: 1px solid var(--hairline);
+    }
+    .s07 .ctrl-group { display: flex; align-items: center; gap: 14px; }
+    .s07 .ctrl-label {
+      font-family: "PingFang SC", sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      color: var(--ink-3);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .s07 .ctrl-label .en {
+      font-family: "Oxanium", monospace;
+      font-size: 9.5px;
+      letter-spacing: 0.22em;
+      color: var(--ink-3);
+      text-transform: uppercase;
+    }
+    .s07 .seg {
+      display: flex;
+      border: 1px solid var(--hairline);
+      background: var(--bg);
+    }
+    .s07 .seg-btn {
+      font-family: "PingFang SC", sans-serif;
+      font-size: 13px;
+      padding: 9px 18px;
+      background: transparent;
+      border: none;
+      color: var(--ink-2);
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+      letter-spacing: 0.04em;
+      position: relative;
+    }
+    .s07 .seg-btn + .seg-btn { border-left: 1px solid var(--hairline); }
+    .s07 .seg-btn:hover { background: rgba(0,0,0,0.03); }
+    .s07 .seg-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .s07 .seg-btn .dot-en {
+      font-family: "Oxanium", monospace;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      margin-right: 6px;
+      opacity: 0.55;
+    }
+    .s07 .status {
+      flex: 1;
+      text-align: right;
+      font-family: "Oxanium", monospace;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .s07 .status .now { color: var(--ink); font-weight: 600; padding-left: 8px; }
+
+    /* ============================================================
+       SLIDE 08 — Dirty layer
+    ============================================================ */
+    .s08 .wrap {
+      position: absolute;
+      inset: 110px 88px 88px 88px;
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 50px;
+    }
+    .s08 .hero-img {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      justify-content: center;
+    }
+    .s08 .hero-pic {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+    }
+    .s08 .text-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .s08 .lead {
+      font-size: 48px;
+      font-weight: 600;
+      line-height: 1.15;
+      margin-bottom: 20px;
+    }
+    .s08 .body {
+      font-size: 14.5px;
+      line-height: 1.85;
+      color: var(--ink-2);
+      margin-bottom: 28px;
+    }
+    .s08 .body strong { color: var(--ink); font-weight: 500; }
+    .s08 .timeline {
+      display: grid;
+      grid-template-columns: 1fr 70px 1fr 70px 1fr;
+      gap: 0;
+      align-items: center;
+      padding-top: 22px;
+      border-top: 1px solid var(--hairline);
+    }
+    .s08 .tl-step { text-align: center; }
+    .s08 .tl-step .pic {
+      width: 100%;
+      aspect-ratio: 4 / 5;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-color: var(--bg-2);
+      margin-bottom: 10px;
+    }
+    .s08 .tl-step .num {
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .s08 .tl-step .nm {
+      font-size: 13px;
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .s08 .tl-arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+    }
+    .s08 .tl-arrow svg { width: 22px; height: 22px; stroke-width: 1.4; }
+    .s08 .tl-arrow .cap {
+      font-family: "Oxanium", monospace;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      text-align: center;
+      max-width: 72px;
+      line-height: 1.4;
+    }
+    .s08 .closer {
+      margin-top: 16px;
+      font-size: 13.5px;
+      line-height: 1.75;
+      color: var(--ink-2);
+    }
+    .s08 .closer strong { color: var(--ink); font-weight: 500; }
+
+    /* ============================================================
+       SLIDE 09 — Details (2×2 icon grid)
+    ============================================================ */
+    .s09 .wrap {
+      position: absolute;
+      inset: 110px 88px 88px 88px;
+      display: flex;
+      flex-direction: column;
+    }
+    .s09 .lead {
+      font-size: 48px;
+      font-weight: 600;
+      line-height: 1.2;
+      max-width: 920px;
+      margin-bottom: 26px;
+    }
+    .s09 .grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 0;
+      border-top: 1px solid var(--hairline);
+    }
+    .s09 .cell {
+      padding: 24px 32px 24px 0;
+      display: grid;
+      grid-template-columns: 36px 1fr 132px;
+      gap: 18px;
+      align-items: center;
+    }
+    .s09 .cell:nth-child(odd) { padding-right: 40px; border-right: 1px solid var(--hairline); }
+    .s09 .cell:nth-child(even) { padding-left: 32px; }
+    .s09 .cell:nth-child(1),
+    .s09 .cell:nth-child(2) { border-bottom: 1px solid var(--hairline); }
+    .s09 .cell .ic {
+      width: 36px; height: 36px;
+      color: var(--accent);
+      align-self: start;
+      margin-top: 2px;
+    }
+    .s09 .cell .ic svg { width: 32px; height: 32px; stroke-width: 1.4; }
+    .s09 .cell .pic {
+      width: 132px;
+      height: 142px;
+      background-color: #F4F2EE;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: cover;
+    }
+    .s09 .cell .pic.sink     { background-image: url('assets/p9_sink.png');    background-position: 8% 58%;  background-size: 320% auto; }
+    .s09 .cell .pic.pegboard { background-image: url('assets/p9_inside.png');  background-position: 50% 22%; background-size: 155% auto; }
+    .s09 .cell .pic.sling    { background-image: url('assets/p9_sling.png');   background-position: 72% 62%; background-size: 200% auto; }
+    .s09 .cell .pic.layered  { background-image: url('assets/p9_inside.png');  background-position: 38% 92%; background-size: 175% auto; }
+    .s09 .cell .meta {
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--ink-3);
+      font-weight: 500;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .s09 .cell h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--ink);
+      letter-spacing: -0.005em;
+    }
+    .s09 .cell p {
+      font-size: 13.5px;
+      line-height: 1.75;
+      color: var(--ink-2);
+    }
+    .s09 .closer {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--hairline);
+      font-size: 13.5px;
+      line-height: 1.75;
+      color: var(--ink-2);
+      max-width: 940px;
+    }
+    .s09 .closer strong { color: var(--ink); font-weight: 500; }
+
+    /* ============================================================
+       SLIDE 10 — Closing
+    ============================================================ */
+    .s10 .hero {
+      position: absolute;
+      inset: 0;
+      background: url('assets/p1_open.jpg') center 56% / cover no-repeat;
+      background-color: var(--bg);
+    }
+    .s10 .hero::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.78) 100%);
+      pointer-events: none;
+    }
+    .s10 .glass {
+      position: absolute;
+      left: 56px;
+      right: 56px;
+      bottom: 56px;
+      padding: 54px 56px 56px;
+      background: rgba(15, 15, 15, 0.78);
+      backdrop-filter: blur(24px) saturate(140%);
+      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      color: #fff;
+      z-index: 3;
+    }
+    .s10.active .glass {
+      animation: riseLong 1s cubic-bezier(.2,.7,.2,1) 0.2s both;
+    }
+    .s10 .glass h2 {
+      font-size: 48px;
+      font-weight: 600;
+      line-height: 1.25;
+      margin-bottom: 32px;
+      color: #fff;
+      letter-spacing: -0.005em;
+      max-width: 920px;
+    }
+    .s10 .glass .lines {
+      display: flex;
+      gap: 36px;
+      margin-bottom: 28px;
+    }
+    .s10 .glass .lines .ln {
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.75;
+      color: rgba(255,255,255,0.74);
+      padding-left: 14px;
+      border-left: 1px solid rgba(255,255,255,0.18);
+    }
+    .s10 .glass .lines .ln .num {
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: #B6C9A8;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .s10 .glass .closer {
+      font-size: 16px;
+      line-height: 1.7;
+      color: #fff;
+      padding-top: 22px;
+      border-top: 1px solid rgba(255,255,255,0.18);
+      font-weight: 400;
+    }
+    .s10 .glass .closer strong { font-weight: 500; }
+
+    /* ============================================================
+       SLIDE 11 — Progress disclosure (sincere note)
+    ============================================================ */
+    .s11 .wrap {
+      position: absolute;
+      inset: 110px 88px 64px 88px;
+      display: flex;
+      flex-direction: column;
+    }
+    .s11 .head {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 56px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+    .s11 .lead {
+      font-size: 42px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.005em;
+      color: var(--ink);
+    }
+    .s11 .lead .accent { color: var(--accent); }
+    .s11 .sub {
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--ink-2);
+      max-width: 440px;
+    }
+    .s11 .sub strong { color: var(--ink); font-weight: 500; }
+    .s11 .section + .section { margin-top: 14px; }
+    .s11 .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 14px 0 12px;
+      border-top: 1px solid var(--hairline);
+    }
+    .s11 .section-head .ttl {
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--ink);
+    }
+    .s11 .section-head .ttl .progress {
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+      margin-left: 12px;
+      font-weight: 600;
+    }
+    .s11 .section-head .ttl .progress.wip { color: var(--ink-3); }
+    .s11 .section-head .en {
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--ink-3);
+      text-transform: uppercase;
+    }
+    .s11 .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+    }
+    .s11 .cell {
+      display: flex;
+      flex-direction: column;
+    }
+    .s11 .cell .pic {
+      width: 100%;
+      height: 158px;
+      background-color: var(--bg-2);
+      background-position: center;
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+    .s11 .cell .cap { margin-top: 10px; }
+    .s11 .cell .cap .num {
+      font-family: "Oxanium", monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--accent);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .s11 .cell .cap .nm {
+      font-size: 13px;
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .s11 .foot {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--hairline);
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: var(--ink-2);
+      max-width: 940px;
+    }
+    .s11 .foot strong { color: var(--ink); font-weight: 500; }
+    .s11.active .lead { animation: rise 0.7s cubic-bezier(.2,.7,.2,1) 0.1s both; }
+    .s11.active .sub  { animation: rise 0.7s cubic-bezier(.2,.7,.2,1) 0.2s both; }
+  </style>
+</head>
+
+<body>
+  <div class="stage" id="stage">
+
+    <!-- ============================== SLIDE 00 — INTRO (cold open) ============================== -->
+    <section class="slide s00 active">
+      <div class="hero"></div>
+
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="kicker">
+        <span class="en">OFF-GRID KITCHEN BOX · 2026</span>
+        <span class="zh">毕设中期汇报</span>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 01 — COVER ============================== -->
+    <section class="slide s01">
+      <div class="hero"></div>
+
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="titles">
+        <div class="product-en">OFF-GRID KITCHEN BOX</div>
+        <h1>野巡</h1>
+        <div class="cruise">CRUISE</div>
+        <p class="lede">一只随车出发的户外餐厨箱。<br><strong>合上时，它跟着车走。</strong> 打开后，一顿户外餐需要的台面、炉具、清洗和收纳，都在这里展开。</p>
+      </div>
+
+    </section>
+
+    <!-- ============================== SLIDE 02 — BACKGROUND ============================== -->
+    <section class="slide s02">
+      <div class="hero"></div>
+
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="glass">
+        <h2>一次轻露营，麻烦常常从吃饭开始。</h2>
+        <div class="body">
+          <p>出发前，食材、炉具、锅具、水和清洁用品分散在不同箱包里。到场后，先找、再搬、再搭。吃完以后，油污餐具和干净物品又要一起塞回车里。</p>
+          <p><strong>真正累人的，不是某一个步骤。</strong> 是这顿饭从出门到回家的每一步都在打断人。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 03 — SCENARIO ============================== -->
+    <section class="slide s03">
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="wrap">
+        <div class="lead">露营餐厨需要的，<br>不只是<span class="accent">一口炉子</span>。</div>
+        <p class="sub">一顿户外餐会经过很多小动作。它们分散在地上、箱子里、桌边和车后备箱里。</p>
+
+        <div class="pipeline">
+          <div class="step"><div class="ic"><i data-lucide="package"></i></div><div class="num">01</div><div class="nm">拿出食材</div></div>
+          <div class="step"><div class="ic"><i data-lucide="chef-hat"></i></div><div class="num">02</div><div class="nm">找地方备菜</div></div>
+          <div class="step"><div class="ic"><i data-lucide="flame"></i></div><div class="num">03</div><div class="nm">开火烹饪</div></div>
+          <div class="step"><div class="ic"><i data-lucide="utensils"></i></div><div class="num">04</div><div class="nm">临时放盘</div></div>
+          <div class="step"><div class="ic"><i data-lucide="droplets"></i></div><div class="num">05</div><div class="nm">洗手</div></div>
+          <div class="step"><div class="ic"><i data-lucide="trash-2"></i></div><div class="num">06</div><div class="nm">收垃圾</div></div>
+          <div class="step"><div class="ic"><i data-lucide="brush"></i></div><div class="num">07</div><div class="nm">处理脏餐具</div></div>
+        </div>
+
+        <p class="foot">所以产品要解决的，不只是「能不能做饭」，<strong>而是这些东西有没有一个清楚的位置。</strong></p>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 04 — BENCHMARK ============================== -->
+    <section class="slide s04">
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="wrap">
+        <div class="lead">现在的露营装备，<br>大多只管<span class="accent">其中一段</span>。</div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="img" style="background-image:url('assets/p4_snowpeak.png');"></div>
+            <div class="info">
+              <div class="role">模块桌 — 解决现场台面</div>
+              <div class="brand">Snow Peak · IGT Camp Kitchen</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="img" style="background-image:url('assets/p4_yeti.png');"></div>
+            <div class="info">
+              <div class="role">收纳箱 — 解决出发前装载</div>
+              <div class="brand">YETI · LoadOut GoBox 30</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="img" style="background-image:url('assets/p4_jetboil.png');"></div>
+            <div class="info">
+              <div class="role">炉具 — 解决烹饪</div>
+              <div class="brand">Jetboil · Genesis Basecamp</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="img" style="background-image:url('assets/p4_macsports.png');"></div>
+            <div class="info">
+              <div class="role">推车 — 解决搬运</div>
+              <div class="brand">Mac Sports · Push & Pull Wagon</div>
+            </div>
+          </div>
+        </div>
+
+        <p class="foot">它们都有效，但用在一顿完整的户外餐里，人还是要自己把这些东西重新拼起来。<strong>野巡想少掉的，就是这段临时拼凑。</strong></p>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 05 — APPROACH ============================== -->
+    <section class="slide s05">
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="wrap">
+        <div class="text-col">
+          <div class="lead">我们先看的不是产品形态，<br><span class="accent">而是一顿饭的顺序。</span></div>
+
+          <div class="points">
+            <div class="point">
+              <div class="ic"><i data-lucide="truck"></i></div>
+              <div class="txt"><span class="meta">01 / Carry</span>东西怎么带出去</div>
+            </div>
+            <div class="point">
+              <div class="ic"><i data-lucide="box"></i></div>
+              <div class="txt"><span class="meta">02 / Unfold</span>到场后怎么打开</div>
+            </div>
+            <div class="point">
+              <div class="ic"><i data-lucide="utensils-crossed"></i></div>
+              <div class="txt"><span class="meta">03 / Cook</span>使用时哪里做饭、哪里放东西</div>
+            </div>
+            <div class="point">
+              <div class="ic"><i data-lucide="recycle"></i></div>
+              <div class="txt"><span class="meta">04 / Return</span>离开前，脏的东西怎么带回来</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="img-col"></div>
+      </div>
+
+      <p class="foot">形态从这里开始变清楚：<strong>它应该先是一只好装车的箱体，再展开成一个能工作的餐厨区。</strong></p>
+    </section>
+
+    <!-- ============================== SLIDE 06 — SYSTEM ============================== -->
+    <section class="slide s06">
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="wrap">
+        <div class="lead">它从一只拖行箱，<br>展开成一张<span class="accent">户外餐厨台</span>。</div>
+        <p class="sub">出发前，食材、锅具和餐具集中装入箱体；到场后，支架撑开，上盖翻起，左右模块向外展开。</p>
+
+        <div class="flow">
+          <div>
+            <div class="stage-img" style="background-image:url('assets/p1_closed.png');"></div>
+            <div class="stage-cap">
+              <span class="num">STATE 01</span>
+              <div class="nm">闭合 · 跟车走</div>
+            </div>
+          </div>
+          <div>
+            <div class="stage-img" style="background-image:url('assets/p5_transition.png');"></div>
+            <div class="stage-cap">
+              <span class="num">STATE 02</span>
+              <div class="nm">半展 · 支架撑开</div>
+            </div>
+          </div>
+          <div>
+            <div class="stage-img" style="background-image:url('assets/p1_open.jpg');"></div>
+            <div class="stage-cap">
+              <span class="num">STATE 03</span>
+              <div class="nm">全展 · 餐厨工作站</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 07 — SURFACE (Interactive) ============================== -->
+    <!--
+      Image–button mapping (edit here to remap if needed):
+        高度 · 站立     → assets/p7_low.png
+        高度 · 坐姿     → assets/p7_default.jpg
+        位置 · 前左 P1  → assets/p7_pos_fl.png
+        位置 · 前右 P2  → assets/p7_pos_fr.png
+        位置 · 后左 P3  → assets/p7_pos_bl.png
+        位置 · 后右 P4  → assets/p7_pos_br.png
+        位置 · 右侧延展 P5 → assets/p7_pos_extend.png
+    -->
+    <section class="slide s07">
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="wrap">
+        <div class="lead">右侧桌面，解决<br>「<span class="accent">台面不够用</span>，也不总在同一个位置用」。</div>
+        <p class="sub">两个维度可调：站立或坐姿的高度，前左 / 前右 / 后左 / 后右 / 右侧延展的位置。</p>
+
+        <div class="stage-wrap" id="p7Stage">
+          <div class="stage-img active" data-key="height-stand"
+               style="background-image:url('assets/p7_low.png');"></div>
+          <div class="stage-img" data-key="height-sit"
+               style="background-image:url('assets/p7_default.jpg');"></div>
+          <div class="stage-img" data-key="pos-fl"
+               style="background-image:url('assets/p7_pos_fl.png');"></div>
+          <div class="stage-img" data-key="pos-fr"
+               style="background-image:url('assets/p7_pos_fr.png');"></div>
+          <div class="stage-img" data-key="pos-bl"
+               style="background-image:url('assets/p7_pos_bl.png');"></div>
+          <div class="stage-img" data-key="pos-br"
+               style="background-image:url('assets/p7_pos_br.png');"></div>
+          <div class="stage-img" data-key="pos-extend"
+               style="background-image:url('assets/p7_pos_extend.png');"></div>
+        </div>
+
+        <div class="control">
+          <div class="ctrl-group">
+            <span class="ctrl-label">高度<span class="en">Height</span></span>
+            <div class="seg" data-group="height">
+              <button class="seg-btn active" data-key="height-stand"><span class="dot-en">H1</span>站立</button>
+              <button class="seg-btn" data-key="height-sit"><span class="dot-en">H2</span>坐姿</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <span class="ctrl-label">位置<span class="en">Position</span></span>
+            <div class="seg" data-group="position">
+              <button class="seg-btn" data-key="pos-fl"><span class="dot-en">P1</span>前左</button>
+              <button class="seg-btn" data-key="pos-fr"><span class="dot-en">P2</span>前右</button>
+              <button class="seg-btn" data-key="pos-bl"><span class="dot-en">P3</span>后左</button>
+              <button class="seg-btn" data-key="pos-br"><span class="dot-en">P4</span>后右</button>
+              <button class="seg-btn" data-key="pos-extend"><span class="dot-en">P5</span>右侧延展</button>
+            </div>
+          </div>
+
+          <div class="status">Now &nbsp;·<span class="now" id="p7Status">站立 / 默认位置</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 08 — DIRTY LAYER ============================== -->
+    <section class="slide s08">
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="wrap">
+        <div class="hero-img">
+          <div class="hero-pic" style="background-image:url('assets/p8_trunk.png');"></div>
+          <div class="hero-pic" style="background-image:url('assets/p8_dash.png');"></div>
+        </div>
+
+        <div class="text-col">
+          <div>
+            <div class="lead">真正麻烦的，<br>是<span class="accent">吃完以后</span>。</div>
+            <p class="body">油污餐具、湿抹布、剩菜，不能直接塞回干净食材区。<br><br>箱体里嵌入一只<strong>可拆卸清洗内胆</strong>——脏污物单独装入，返程途中提前清洗，回家只洗这一层。</p>
+          </div>
+
+          <div>
+            <div class="timeline">
+              <div class="tl-step">
+                <div class="pic" style="background-image:url('assets/p8_depart.png');"></div>
+                <div class="num">STEP 01</div>
+                <div class="nm">出发 · 模块嵌入</div>
+              </div>
+
+              <div class="tl-arrow">
+                <i data-lucide="droplets"></i>
+              </div>
+
+              <div class="tl-step">
+                <div class="pic" style="background-image:url('assets/p8_wash.png');"></div>
+                <div class="num">STEP 02</div>
+                <div class="nm">中途 · 单独清洗</div>
+              </div>
+
+              <div class="tl-arrow">
+                <i data-lucide="arrow-right"></i>
+              </div>
+
+              <div class="tl-step">
+                <div class="pic" style="background-image:url('assets/p8_return.png');"></div>
+                <div class="num">STEP 03</div>
+                <div class="nm">返程 · 脏净分离</div>
+              </div>
+            </div>
+
+            <p class="closer"><strong>脏的有地方待着，</strong>整只箱子就不会被拖下水。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 09 — DETAILS ============================== -->
+    <section class="slide s09">
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="wrap">
+        <div class="lead">这些细节，<br>都是为了让<span class="accent">现场少乱一点</span>。</div>
+
+        <div class="grid">
+          <div class="cell">
+            <div class="ic"><i data-lucide="droplet"></i></div>
+            <div>
+              <div class="meta">01 / Sink</div>
+              <h3>水槽外接</h3>
+              <p>水槽接入外部水桶，简单清洗不用离开餐厨区。</p>
+            </div>
+            <div class="pic sink"></div>
+          </div>
+          <div class="cell">
+            <div class="ic"><i data-lucide="grid-3x3"></i></div>
+            <div>
+              <div class="meta">02 / Pegboard</div>
+              <h3>洞洞板挂载</h3>
+              <p>把锅铲、夹子、纸巾和调料挂起来，桌面就不会越用越满。</p>
+            </div>
+            <div class="pic pegboard"></div>
+          </div>
+          <div class="cell">
+            <div class="ic"><i data-lucide="shopping-bag"></i></div>
+            <div>
+              <div class="meta">03 / Sling</div>
+              <h3>软网兜收纳</h3>
+              <p>下方软网兜收纳折叠椅，减少单独搬运。</p>
+            </div>
+            <div class="pic sling"></div>
+          </div>
+          <div class="cell">
+            <div class="ic"><i data-lucide="layers-3"></i></div>
+            <div>
+              <div class="meta">04 / Layered</div>
+              <h3>分层储物</h3>
+              <p>内部储物空间分层放入食材、锅具和餐具。</p>
+            </div>
+            <div class="pic layered"></div>
+          </div>
+        </div>
+
+        <p class="closer">它处理的不是某一个漂亮功能，<strong>而是这顿饭从带出去到带回来的完整过程。</strong></p>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 10 — CLOSING ============================== -->
+    <section class="slide s10">
+      <div class="hero"></div>
+
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="glass">
+        <h2>让轻露营里的那顿饭，<br>少一点折腾。</h2>
+        <div class="lines">
+          <div class="ln"><span class="num">01</span>不用到现场再翻一遍。</div>
+          <div class="ln"><span class="num">02</span>不用为了吃饭重新搭一套东西。</div>
+          <div class="ln"><span class="num">03</span>也不用把脏的、湿的、油的塞回干净箱子里。</div>
+        </div>
+        <div class="closer"><strong>野巡 · CRUISE</strong> 把一顿户外餐，收进一只可以出发的箱子里。</div>
+      </div>
+    </section>
+
+    <!-- ============================== SLIDE 11 — PROGRESS DISCLOSURE ============================== -->
+    <section class="slide s11">
+      <div class="brand-mark">
+        <span class="zh">野巡</span>
+        <span class="bar"></span>
+        <span class="en">CRUISE</span>
+      </div>
+
+      <div class="wrap">
+        <div class="head">
+          <div class="lead">模型已经搭好了，<br>只剩<span class="accent">最后一段渲染</span>。</div>
+          <p class="sub">我们预计在<strong>两天之内</strong>完成产品渲染，外观也会有一轮<strong>比较大的优化</strong>。</p>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div class="ttl">当前建模 · 三种状态<span class="progress">BUILT · 100%</span></div>
+            <div class="en">Modeling States · Done</div>
+          </div>
+          <div class="row">
+            <div class="cell">
+              <div class="pic" style="background-image:url('assets/p11_closed.png');"></div>
+              <div class="cap"><span class="num">STATE 01</span><div class="nm">闭合 · 跟车走</div></div>
+            </div>
+            <div class="cell">
+              <div class="pic" style="background-image:url('assets/p11_half.png');"></div>
+              <div class="cap"><span class="num">STATE 02</span><div class="nm">半展 · 支架撑开</div></div>
+            </div>
+            <div class="cell">
+              <div class="pic" style="background-image:url('assets/p11_open.png');"></div>
+              <div class="cap"><span class="num">STATE 03</span><div class="nm">全展 · 餐厨工作站</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div class="ttl">外观语言 · 工业设计风探索<span class="progress wip">RENDERING · IN PROGRESS</span></div>
+            <div class="en">Design Language · Iterating</div>
+          </div>
+          <div class="row">
+            <div class="cell">
+              <div class="pic" style="background-image:url('assets/p11_detail1.png');"></div>
+              <div class="cap"><span class="num">STUDY 01</span><div class="nm">体量与切面</div></div>
+            </div>
+            <div class="cell">
+              <div class="pic" style="background-image:url('assets/p11_detail2.png');"></div>
+              <div class="cap"><span class="num">STUDY 02</span><div class="nm">细部与机构</div></div>
+            </div>
+            <div class="cell">
+              <div class="pic" style="background-image:url('assets/p11_detail3.png');"></div>
+              <div class="cap"><span class="num">STUDY 03</span><div class="nm">材质与配色</div></div>
+            </div>
+          </div>
+        </div>
+
+        <p class="foot">预计两天内出第一批正式渲染图，外观和材质还会再过一轮。<strong>下次见到它，已经穿好衣服了。</strong></p>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="dots" id="dots" aria-label="幻灯片导航"></nav>
+
+  <script>
+    /* =========================================================
+       VIEWPORT SCALING
+    ========================================================= */
+    const SLIDE_W = 1280, SLIDE_H = 720;
+    const stage = document.getElementById('stage');
+
+    function scaleStage() {
+      const sx = window.innerWidth / SLIDE_W;
+      const sy = window.innerHeight / SLIDE_H;
+      const s  = Math.min(sx, sy);
+      const ox = (window.innerWidth  - SLIDE_W * s) / 2;
+      const oy = (window.innerHeight - SLIDE_H * s) / 2;
+      stage.style.transform = `translate(${ox}px, ${oy}px) scale(${s})`;
+    }
+    window.addEventListener('resize', scaleStage);
+    document.addEventListener('fullscreenchange', scaleStage);
+    scaleStage();
+
+    /* =========================================================
+       NAVIGATION
+    ========================================================= */
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let idx = 0;
+
+    const dotsNav = document.getElementById('dots');
+    slides.forEach((_, i) => {
+      const b = document.createElement('button');
+      b.className = 'dot' + (i === 0 ? ' active' : '');
+      b.setAttribute('aria-label', `第 ${i + 1} 页`);
+      b.addEventListener('click', e => { e.stopPropagation(); go(i); });
+      dotsNav.appendChild(b);
+    });
+
+    function go(n) {
+      if (n < 0 || n >= slides.length || n === idx) return;
+      slides[idx].classList.remove('active');
+      idx = n;
+      slides[idx].classList.add('active');
+      document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+    }
+    function next() { go(idx + 1); }
+    function prev() { go(idx - 1); }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { next(); e.preventDefault(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { prev(); e.preventDefault(); }
+      else if (e.key === 'Home') go(0);
+      else if (e.key === 'End') go(slides.length - 1);
+    });
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('button, a, input, .seg, .dots, [data-no-nav]')) return;
+      if (e.clientX > window.innerWidth / 2) next(); else prev();
+    });
+
+    let tStart = 0;
+    document.addEventListener('touchstart', e => { tStart = e.touches[0].clientX; }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const d = tStart - e.changedTouches[0].clientX;
+      if (Math.abs(d) > 50) (d > 0 ? next() : prev());
+    }, { passive: true });
+
+    let wheelLock = false;
+    document.addEventListener('wheel', e => {
+      if (wheelLock || Math.abs(e.deltaY) < 12) return;
+      wheelLock = true;
+      setTimeout(() => wheelLock = false, 750);
+      e.deltaY > 0 ? next() : prev();
+    }, { passive: true });
+
+    /* =========================================================
+       SLIDE 07 — Interactive toggle groups
+    ========================================================= */
+    const p7Stage = document.getElementById('p7Stage');
+    const p7Status = document.getElementById('p7Status');
+    const heightSeg = document.querySelector('.s07 .seg[data-group="height"]');
+    const posSeg    = document.querySelector('.s07 .seg[data-group="position"]');
+
+    const LABELS = {
+      'height-stand': '站立',
+      'height-sit':   '坐姿',
+      'pos-fl':       '前左',
+      'pos-fr':       '前右',
+      'pos-bl':       '后左',
+      'pos-br':       '后右',
+      'pos-extend':   '右侧延展',
+    };
+
+    let heightKey = 'height-stand';
+    let posKey    = null;
+    let lastTouchedGroup = 'height';
+
+    function applyP7() {
+      const key = (lastTouchedGroup === 'height' || posKey === null) ? heightKey : posKey;
+      p7Stage.querySelectorAll('.stage-img').forEach(el => {
+        el.classList.toggle('active', el.dataset.key === key);
+      });
+      const h = LABELS[heightKey];
+      const p = posKey ? LABELS[posKey] : '默认位置';
+      p7Status.textContent = `${h} / ${p}`;
+    }
+
+    heightSeg.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        heightSeg.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        heightKey = btn.dataset.key;
+        lastTouchedGroup = 'height';
+        applyP7();
+      });
+    });
+    posSeg.querySelectorAll('.seg-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        posSeg.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        posKey = btn.dataset.key;
+        lastTouchedGroup = 'position';
+        applyP7();
+      });
+    });
+
+    /* Render Lucide icons */
+    window.addEventListener('load', () => {
+      if (window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>
